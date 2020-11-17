@@ -1,6 +1,8 @@
 import inspect
 import logging
 import shlex
+import pygame.midi
+import asyncio
 
 from aioconsole import ainput
 
@@ -9,6 +11,19 @@ from joycontrol.transport import NotConnectedError
 
 logger = logging.getLogger(__name__)
 
+midi_to_key = {38: "a",
+               48: "x",
+               46: "r",
+               42: "r",
+               36: "l&&r&&a",
+               51: "stick l h 3000",
+               55: "stick l h 1048",
+               45: "down",
+               6: "hold b&&stick l center",
+               5: "release b&&stick l center",
+               7: "stick l center"}
+
+pygame.midi.init()
 
 def _print_doc(string):
     """
@@ -61,6 +76,11 @@ class CLI:
         print('Type "exit" to close.')
 
     async def run(self):
+        count = pg.get_count()
+        for i in range(count):
+            print(pg.get_device_info(i))
+        inp = pg.Input(3)
+
         while True:
             user_input = await ainput(prompt='cmd >> ')
             if not user_input:
@@ -159,10 +179,48 @@ class ControllerCLI(CLI):
             raise ValueError('Value of side must be "l", "left" or "r", "right"')
 
     async def run(self):
+        count = pygame.midi.get_count()
+        for i in range(count):
+            print(pygame.midi.get_device_info(i))
+        inp = pygame.midi.Input(3)
+        timerspeed = 0
+        timer = 0
+        await asyncio.sleep(20)
         while True:
-            user_input = await ainput(prompt='cmd >> ')
+            #user_input = await ainput(prompt='cmd >> ')
+            await asyncio.sleep(0.01)
+            timer += timerspeed
+            user_input = ""
+            midi_input = []
+            if inp.poll():
+                full = inp.read(10)
+                print(full)
+                for u in full:
+                    #print(u)
+                    if not u[0][1] in midi_input:
+                        if u[0][1] == 4:
+                            midi_input.append(6 if u[0][2]>60 else 5)
+                        elif u[0][0]==137:
+                            midi_input.append(u[0][1])
+                    print(midi_input)
+            if timer > 0.3:
+                midi_input.append(7)
+                timer = 0
+                timerspeed = 0
+
+            add = ""
+            for m in midi_input:
+                addbut = midi_to_key.get(m, None)
+                if addbut and not addbut in user_input:
+                    user_input += add + addbut
+                    add = "&&"
+
             if not user_input:
                 continue
+
+            if "stick l h" in user_input:
+                timerspeed = 0.01
+                timer = 0
 
             buttons_to_push = []
 
