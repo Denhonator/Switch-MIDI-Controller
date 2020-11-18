@@ -15,13 +15,16 @@ midi_to_key = {38: "a",
                48: "x",
                46: "r",
                42: "r",
-               36: "l&&r&&a",
+               36: "l",
                51: "stick l h 3000",
                55: "stick l h 1048",
-               45: "down",
+               45: "up",
+               41: "down",
                6: "hold b&&stick l center",
                5: "release b&&stick l center",
                7: "stick l center"}
+
+arlBuffer = {38: 0, 46: 0, 36: 0}
 
 pygame.midi.init()
 
@@ -202,7 +205,15 @@ class ControllerCLI(CLI):
                             midi_input.append(6 if u[0][2]>60 else 5)
                         elif u[0][0]==137:
                             midi_input.append(u[0][1])
-                    print(midi_input)
+                            arlBuffer[u[0][1]] = 0.1
+                for k in arlBuffer.keys():
+                    if arlBuffer[k]>0 and not k in midi_input:
+                        midi_input.append(k)
+                print(midi_input)
+
+            for k in arlBuffer.keys():
+                arlBuffer[k] = max(0.0, arlBuffer[k]-0.01)
+
             if timer > 0.3:
                 midi_input.append(7)
                 timer = 0
