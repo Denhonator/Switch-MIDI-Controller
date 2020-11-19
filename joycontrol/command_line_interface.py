@@ -14,13 +14,12 @@ logger = logging.getLogger(__name__)
 
 midi_to_key = {38: "hold a&&hold y",
                48: "hold x",
-               46: "hold l&&hold zl",
                42: "hold l&&hold zl",
                36: "hold r&&hold zr",
-               51: "stick l h 3200&&stick r left",
-               55: "stick l h 848&&stick r right",
-               45: "stick l up&&stick r down",
-               41: "stick l down&&stick r up",
+               51: "stick l h 3200&&stick r h 3200",
+               55: "stick l h 848&&stick r h 848",
+               45: "stick l up&&stick r up",
+               41: "stick l down&&stick r down",
                6: "hold b&&stick l center",
                5: "release b&&stick l center",
                7: "stick l center"}
@@ -203,6 +202,7 @@ class ControllerCLI(CLI):
             user_input = ""
             if msg:
                 if msg.type=="note_on":
+                    msg.note = 42 if msg.note == 46 or (msg.note==38 and 38 in arlBuffer.keys()) else msg.note
                     user_input = midi_to_key.get(msg.note, "")
                     arlBuffer[msg.note] = 0.04 if not "stick" in user_input else 0.3
                     if msg.note==48:
