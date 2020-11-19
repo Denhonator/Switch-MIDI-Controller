@@ -204,8 +204,7 @@ class ControllerCLI(CLI):
                     if not "stick" in midi_to_key.get(msg.note, ""):
                         user_input = "hold "
                     user_input += midi_to_key.get(msg.note, "")
-                    arlBuffer[msg.note] = 0.04 * (5 if "stick" in user_input else 1)
-                    print("hit")
+                    arlBuffer[msg.note] = 0.04 if not "stick" in user_input else 0.3
                 elif msg.type=="control_change":
                     if msg.value > 64 and not jumpstate:
                         user_input = midi_to_key.get(6, "")
@@ -220,7 +219,6 @@ class ControllerCLI(CLI):
                             user_input = "stick l center"
                         else:
                             user_input = "release " + midi_to_key.get(k, "")
-                            print("release")
                         del arlBuffer[k]
                         break
             if not user_input:
