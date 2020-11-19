@@ -3,7 +3,6 @@ import logging
 import shlex
 import mido
 import asyncio
-import time
 
 from aioconsole import ainput
 
@@ -25,7 +24,7 @@ midi_to_key = {38: "a",
                5: "release b&&stick l center",
                7: "stick l center"}
 
-arlBuffer = {}
+arlBuffer = {38: 0, 46: 0, 36: 0}
 
 def _print_doc(string):
     """
@@ -181,6 +180,9 @@ class ControllerCLI(CLI):
             raise ValueError('Value of side must be "l", "left" or "r", "right"')
 
     async def run(self):
+        timerspeed = 0
+        timer = 0
+        
         inputs = mido.get_input_names()
         portname = ""
         for i in inputs:
@@ -189,44 +191,28 @@ class ControllerCLI(CLI):
                 break
 
         inport = mido.open_input(portname)
-        timer = time.perf_counter()
-        jumpstate = False
 
-        while True:
-            dtime = time.perf_counter()-timer
-            timer = time.perf_counter()
-            msg = inport.poll()
-            for k in arlBuffer.keys():
-                arlBuffer[k] -= dtime
+        for msg in inport:
+            timer += timerspeed
             user_input = ""
-            if msg:
-                if msg.type=="note_on":
-                    if not "stick" in midi_to_key.get(msg.note, ""):
-                        user_input = "hold "
-                    user_input += midi_to_key.get(msg.note, "")
-                    arlBuffer[msg.note] = 0.04 * (5 if "stick" in user_input else 1)
-                    print("hit")
-                elif msg.type=="control_change":
-                    if msg.value > 64 and not jumpstate:
-                        user_input = midi_to_key.get(6, "")
-                        jumpstate = True
-                    elif msg.value <= 64 and jumpstate:
-                        user_input = midi_to_key.get(5, "")
-                        jumpstate = False
-            else:
-                for k in arlBuffer.keys():
-                    if arlBuffer[k]<=0:
-                        if "stick" in midi_to_key.get(k, ""):
-                            user_input = "stick l center"
-                        else:
-                            user_input = "release " + midi_to_key.get(k, "")
-                            print("release")
-                        del arlBuffer[k]
-                        break
-            if not user_input:
-                await asyncio.sleep(0.005)
-                continue
 
+                justhit = False
+                for u in full:
+                    #print(u)
+                    if not u[0][1] in midi_input:
+                        if u[0][1] == 4:
+                            midi_input.append(6 if u[0][2]>60 else 5)
+                        elif u[0][0] == 137:
+                            midi_input.append(u[0][1])
+                            arlBuffer[u[0][1]] = 0.06
+                            justhit = True
+                if justhit and False:
+                    for k in arlBuffer.keys():
+                        if arlBuffer[k]>0 and not k in midi_input:
+                            midi_input.append(k)
+                print(midi_input)
+
+            if not us
             buttons_to_push = []
 
             for command in user_input.split('&&'):
@@ -257,11 +243,10 @@ class ControllerCLI(CLI):
                     print('command', cmd, 'not found, call help for help.')
 
             if buttons_to_push:
-                print("button push")
                 await button_push(self.controller_state, *buttons_to_push)
-            #else:
-            #    try:
-            #        await self.controller_state.send()
-            #    except NotConnectedError:
-            #        logger.info('Connection was lost.')
-            #        return
+            else:
+                try:
+                    await self.controller_state.send()
+                except NotConnectedError:
+                    logger.info('Connection was lost.')
+                    return
