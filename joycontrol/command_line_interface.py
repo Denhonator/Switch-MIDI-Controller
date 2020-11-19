@@ -12,15 +12,15 @@ from joycontrol.transport import NotConnectedError
 
 logger = logging.getLogger(__name__)
 
-midi_to_key = {38: "a",
-               48: "x",
-               46: "r",
-               42: "r",
-               36: "l",
-               51: "stick l h 3000",
-               55: "stick l h 1048",
-               45: "up",
-               41: "down",
+midi_to_key = {38: "hold a&&hold y",
+               48: "hold x",
+               46: "hold l&&hold zl",
+               42: "hold l&&hold zl",
+               36: "hold r&&hold zr",
+               51: "stick l h 3200&&stick r left",
+               55: "stick l h 848&&stick r right",
+               45: "stick l up&&stick r down",
+               41: "stick l down&&stick r up",
                6: "hold b&&stick l center",
                5: "release b&&stick l center",
                7: "stick l center"}
@@ -191,6 +191,8 @@ class ControllerCLI(CLI):
         inport = mido.open_input(portname)
         timer = time.perf_counter()
         jumpstate = False
+        menumode = True
+        menuCounter = 0
 
         while True:
             dtime = time.perf_counter()-timer
@@ -201,10 +203,16 @@ class ControllerCLI(CLI):
             user_input = ""
             if msg:
                 if msg.type=="note_on":
-                    if not "stick" in midi_to_key.get(msg.note, ""):
-                        user_input = "hold "
-                    user_input += midi_to_key.get(msg.note, "")
+                    user_input = midi_to_key.get(msg.note, "")
                     arlBuffer[msg.note] = 0.04 if not "stick" in user_input else 0.3
+                    if msg.note==48:
+                        menuCounter += 1
+                        if menuCounter>10:
+                            menumode = not menumode
+                            menuCounter = 0
+                            print("menumode "+str(menumode))
+                    else:
+                        menuCounter = 0
                 elif msg.type=="control_change":
                     if msg.value > 64 and not jumpstate:
                         user_input = midi_to_key.get(6, "")
@@ -215,16 +223,18 @@ class ControllerCLI(CLI):
             else:
                 for k in arlBuffer.keys():
                     if arlBuffer[k]<=0:
-                        if "stick" in midi_to_key.get(k, ""):
-                            user_input = "stick l center"
-                        else:
-                            user_input = "release " + midi_to_key.get(k, "")
+                        user_input = midi_to_key.get(k, "").replace("hold", "release")
+                        for s in midi_to_key.get(k, "").split("&&"):
+                            if "stick" in s:
+                                user_input = user_input.replace(s.split(" ", 2)[-1], "center")
                         del arlBuffer[k]
                         break
             if not user_input:
                 await asyncio.sleep(0.005)
                 continue
-
+            if menumode:
+                user_input = user_input.split("&&")[0]
+            print(user_input)
             buttons_to_push = []
 
             for command in user_input.split('&&'):
